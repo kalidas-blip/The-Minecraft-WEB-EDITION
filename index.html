@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A playable Minecraft Web Edition inspired browser voxel game made with HTML, JavaScript, and Three.js.">
+  <title>Minecraft Web Edition</title>
+  <style>
+    :root {
+      --dark: #0b1220;
+      --panel: rgba(15, 23, 42, 0.82);
+      --panel-strong: rgba(2, 6, 23, 0.92);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --green: #22c55e;
+      --blue: #38bdf8;
+      --orange: #f59e0b;
+      --red: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #050816;
+      color: var(--text);
+      font-family: Verdana, Arial, Helvetica, sans-serif;
+      user-select: none;
+      image-rendering: pixelated;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #gameRoot {
+      position: fixed;
+      inset: 0;
+      background: #050816;
+    }
+
+    #crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    #crosshair::before,
+    #crosshair::after {
+      content: "";
+      position: absolute;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
+    }
+
+    #crosshair::before {
+      left: 8px;
+      top: 1px;
+      width: 2px;
+      height: 16px;
+    }
+
+    #crosshair::after {
+      left: 1px;
+      top: 8px;
+      width: 16px;
+      height: 2px;
+    }
+
+    #hud {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      z-index: 25;
+      width: min(620px, calc(100vw - 20px));
+      pointer-events: none;
+    }
+
+    .bars {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      text-shadow: 0 2px 0 #000;
+      font-size: 20px;
+      letter-spacing: 1px;
+      padding: 0 8px;
+    }
+
+    #healthBar {
+      color: #ef4444;
+    }
+
+    #hungerBar {
+      color: #f59e0b;
+    }
+
+    #armorBar {
+      color: #93c5fd;
+    }
+
+    .hudIcons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 18px;
+    }
+
+    .hudIcon {
+      width: 13px;
+      height: 13px;
+      display: inline-block;
+      filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.75));
+    }
+
+    .heartIcon {
+      position: relative;
+      transform: rotate(-45deg);
+      background: #ef4444;
+      border: 1px solid rgba(80, 0, 0, 0.45);
+    }
+
+    .heartIcon::before,
+    .heartIcon::after {
+      content: "";
+      position: absolute;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: inherit;
+    }
+
+    .heartIcon::before {
+      left: 0;
+      top: -6px;
+    }
+
+    .heartIcon::after {
+      left: 6px;
+      top: 0;
+    }
+
+    .foodIcon {
+      width: 12px;
+      height: 16px;
+      border-radius: 50% 50% 45% 45%;
+      background: linear-gradient(180deg, #fbbf24, #f97316);
+      border: 1px solid rgba(100, 45, 0, 0.5);
+    }
+
+    .armorIcon {
+      width: 14px;
+      height: 16px;
+      clip-path: polygon(50% 0, 100% 18%, 88% 78%, 50% 100%, 12% 78%, 0 18%);
+      background: linear-gradient(180deg, #bfdbfe, #60a5fa);
+      border: 1px solid rgba(30, 64, 175, 0.4);
+    }
+
+    .hudIcon.empty {
+      opacity: 0.28;
+      background: #111827;
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    #xpWrap {
+      height: 7px;
+      border: 2px solid #151515;
+      background: rgba(10, 10, 10, 0.88);
+      margin: 0 auto 5px;
+      width: calc(100% - 90px);
+      border-radius: 0;
+      overflow: hidden;
+    }
+
+    #xpBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #16a34a, #86efac);
+    }
+
+    #hotbar {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 0;
+      background: rgba(0, 0, 0, 0.35);
+      border: 0;
+      padding: 0;
+      border-radius: 0;
+      backdrop-filter: none;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.55);
+    }
+
+    .slot {
+      position: relative;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #777;
+      border: 3px solid #202020;
+      border-radius: 0;
+      box-shadow:
+        inset 3px 3px 0 rgba(255, 255, 255, 0.45),
+        inset -3px -3px 0 rgba(0, 0, 0, 0.45);
+    }
+
+    .slot.active {
+      border-color: #f8fafc;
+      z-index: 2;
+      box-shadow:
+        0 0 0 3px #dbeafe,
+        inset 3px 3px 0 rgba(255, 255, 255, 0.6),
+        inset -3px -3px 0 rgba(0, 0, 0, 0.5);
+    }
+
+    .slotIcon {
+      width: 32px;
+      height: 32px;
+      border-radius: 0;
+      border: 2px solid rgba(0, 0, 0, 0.22);
+      box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.18), inset 0 -5px 0 rgba(0, 0, 0, 0.22);
+    }
+
+    .slotCount {
+      position: absolute;
+      right: 6px;
+      bottom: 4px;
+      color: white;
+      font-weight: 700;
+      text-shadow: 0 2px 0 #000;
+      font-size: 14px;
+    }
+
+    #topLeft {
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #blockTooltip,
+    #statusText {
+      width: fit-content;
+      max-width: 360px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      font-size: 13px;
+    }
+
+    #breakBarWrap {
+      position: fixed;
+      left: 50%;
+      top: calc(50% + 28px);
+      transform: translateX(-50%);
+      width: 160px;
+      height: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      overflow: hidden;
+      z-index: 21;
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    #breakBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f97316, #facc15);
+    }
+
+    #minimap {
+      position: fixed;
+      right: 14px;
+      top: 14px;
+      z-index: 30;
+      width: 148px;
+      height: 148px;
+      border-radius: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      background: rgba(2, 6, 23, 0.6);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    #chatLog {
+      position: fixed;
+      left: 14px;
+      bottom: 128px;
+      z-index: 32;
+      width: min(560px, calc(100vw - 30px));
+      max-height: 180px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 3px;
+      pointer-events: none;
+    }
+
+    .chatLine {
+      padding: 5px 8px;
+      border-radius: 6px;
+      width: fit-content;
+      max-width: 100%;
+      color: #e0f2fe;
+      background: rgba(2, 6, 23, 0.72);
+      font-size: 13px;
+      text-shadow: 0 1px 0 #000;
+    }
+
+    #chatInput {
+      position: fixed;
+      left: 14px;
+      bottom: 90px;
+      z-index: 60;
+      width: min(560px, calc(100vw - 30px));
+      padding: 10px 12px;
+      border-radius: 8px;
+      outline: none;
+      color: white;
+      background: rgba(2, 6, 23, 0.9);
+      border: 1px solid #38bdf8;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    }
+
+    .screen {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        linear-gradient(180deg, rgba(8, 18, 42, 0.22), rgba(1, 8, 20, 0.9)),
+        radial-gradient(circle at 18% 18%, rgba(34, 197, 94, 0.25), transparent 30%),
+        radial-gradient(circle at 80% 22%, rgba(56, 189, 248, 0.22), transparent 34%),
+        radial-gradient(circle at 50% 100%, rgba(132, 204, 22, 0.18), transparent 35%),
+        #07111f;
+      backdrop-filter: blur(5px);
+      overflow: hidden;
+    }
+
+    .screen::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(to bottom, transparent, black 18%, black 70%, transparent);
+      animation: gridDrift 12s linear infinite;
+      pointer-events: none;
+    }
+
+    .screen::after {
+      content: "";
+      position: absolute;
+      left: -10%;
+      right: -10%;
+      bottom: -80px;
+      height: 180px;
+      background:
+        linear-gradient(135deg, rgba(39, 122, 49, 0.95) 25%, transparent 25%) 0 0 / 48px 48px,
+        linear-gradient(225deg, rgba(20, 83, 45, 0.9) 25%, transparent 25%) 0 0 / 48px 48px,
+        linear-gradient(45deg, rgba(77, 124, 15, 0.85) 25%, transparent 25%) 0 0 / 48px 48px,
+        #14532d;
+      transform: perspective(600px) rotateX(58deg);
+      transform-origin: center bottom;
+      filter: saturate(1.2);
+      pointer-events: none;
+    }
+
+    @keyframes gridDrift {
+      from { background-position: 0 0; }
+      to { background-position: 48px 48px; }
+    }
+
+    .menuScene {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .menuCube {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      transform: rotate(45deg) skew(-8deg, -8deg);
+      background: linear-gradient(135deg, #3f9f37 0 48%, #795332 49% 100%);
+      border: 2px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35), inset 0 8px 0 rgba(255,255,255,0.16);
+      opacity: 0.85;
+      animation: cubeFloat 7s ease-in-out infinite;
+    }
+
+    .menuCube.stone {
+      background: linear-gradient(135deg, #9ca3af 0 52%, #4b5563 53% 100%);
+    }
+
+    .menuCube.wood {
+      background: linear-gradient(135deg, #b8874f 0 52%, #6b3f22 53% 100%);
+    }
+
+    .menuCube.water {
+      background: linear-gradient(135deg, rgba(56,189,248,0.9), rgba(37,99,235,0.72));
+    }
+
+    .cube1 { left: 13%; top: 18%; animation-delay: -0.5s; }
+    .cube2 { right: 14%; top: 17%; width: 58px; height: 58px; animation-delay: -1.8s; }
+    .cube3 { left: 22%; bottom: 25%; width: 34px; height: 34px; animation-delay: -3s; }
+    .cube4 { right: 24%; bottom: 22%; width: 38px; height: 38px; animation-delay: -4.1s; }
+    .cube5 { left: 46%; top: 10%; width: 28px; height: 28px; animation-delay: -2.4s; }
+
+    @keyframes cubeFloat {
+      0%, 100% { transform: translateY(0) rotate(45deg) skew(-8deg, -8deg); }
+      50% { transform: translateY(-18px) rotate(45deg) skew(-8deg, -8deg); }
+    }
+
+    .menuCard {
+      position: relative;
+      z-index: 2;
+      width: min(520px, calc(100vw - 28px));
+      padding: 30px;
+      border-radius: 22px;
+      background:
+        linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.94)),
+        rgba(2, 6, 23, 0.94);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      box-shadow:
+        0 30px 100px rgba(0, 0, 0, 0.62),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 60px rgba(34, 197, 94, 0.08);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .menuCard::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      transform: translateX(-120%);
+      animation: menuShine 5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes menuShine {
+      0%, 72% { transform: translateX(-120%); }
+      100% { transform: translateX(120%); }
+    }
+
+    .menuBadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      color: #bbf7d0;
+      background: rgba(22, 101, 52, 0.25);
+      border: 1px solid rgba(74, 222, 128, 0.22);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .menuCard h1 {
+      margin: 0 0 10px;
+      font-size: clamp(42px, 7vw, 64px);
+      letter-spacing: 1px;
+      line-height: 0.95;
+      color: #f8fafc;
+      text-shadow:
+        0 5px 0 #0f172a,
+        0 10px 24px rgba(0, 0, 0, 0.55),
+        0 0 30px rgba(56, 189, 248, 0.16);
+    }
+
+    .menuCard p {
+      margin: 0 auto 20px;
+      max-width: 420px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .menuChips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin: 0 0 18px;
+    }
+
+    .menuChip {
+      padding: 7px 10px;
+      border-radius: 999px;
+      color: #dbeafe;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .menuButtons {
+      display: grid;
+      gap: 10px;
+    }
+
+    .menuButtons button,
+    .smallButton {
+      position: relative;
+      padding: 14px 16px;
+      color: white;
+      background: linear-gradient(135deg, #22c55e, #0891b2);
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      box-shadow: 0 14px 30px rgba(34, 197, 94, 0.18);
+      transition: transform 0.16s ease, filter 0.16s ease;
+      overflow: hidden;
+    }
+
+    .menuButtons button::after,
+    .smallButton::after {
+      content: "";
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 4px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+    }
+
+    .menuButtons button:hover,
+    .smallButton:hover {
+      transform: translateY(-2px) scale(1.01);
+      filter: brightness(1.12);
+    }
+
+    .menuButtons .plainButton,
+    .plainButton {
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: none;
+    }
+
+    .menuFooter {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+      color: #94a3b8;
+      font-size: 12px;
+    }
+
+    .menuFooter span {
+      padding: 5px 8px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+    }
+
+    #mainMenu {
+      align-items: flex-start;
+      background:
+        linear-gradient(180deg, rgba(116, 166, 255, 0.25), rgba(10, 38, 95, 0.2)),
+        #75a8ff;
+      backdrop-filter: none;
+    }
+
+    #mainMenu::before {
+      display: none;
+    }
+
+    #mainMenu::after {
+      display: none;
+    }
+
+    .minecraftBackdrop {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.16), transparent 38%),
+        linear-gradient(#86b4ff 0 43%, #d7efff 44% 46%, transparent 47%),
+        linear-gradient(180deg, #88b8ff, #b6d6ff 43%, #86c973 44%, #4c8b3d 100%);
+      image-rendering: pixelated;
+    }
+
+    .minecraftBackdrop::before {
+      content: "";
+      position: absolute;
+      left: -6vw;
+      right: -6vw;
+      bottom: 156px;
+      height: 105px;
+      background:
+        linear-gradient(135deg, transparent 0 35%, rgba(255,255,255,0.22) 36% 42%, transparent 43%),
+        linear-gradient(180deg, #6f9868 0 24%, #5e7e5e 25% 44%, #766d5f 45% 72%, #4b4036 73% 100%);
+      clip-path: polygon(0 100%, 0 72%, 7% 60%, 15% 66%, 23% 48%, 34% 58%, 45% 32%, 57% 50%, 70% 20%, 83% 58%, 100% 42%, 100% 100%);
+      opacity: 0.9;
+      filter: blur(0.2px);
+    }
+
+    .minecraftBackdrop::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 126px;
+      height: 42px;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0 28px, transparent 28px 54px),
+        linear-gradient(180deg, #236fd1, #165aa8);
+      clip-path: polygon(0 50%, 12% 46%, 22% 54%, 35% 38%, 49% 48%, 62% 34%, 78% 48%, 100% 42%, 100% 100%, 0 100%);
+      box-shadow: 0 -8px 0 rgba(244, 231, 170, 0.9);
+    }
+
+    .mcCloud {
+      position: absolute;
+      height: 22px;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow:
+        32px 0 rgba(255, 255, 255, 0.92),
+        64px 0 rgba(255, 255, 255, 0.88),
+        96px 0 rgba(255, 255, 255, 0.82),
+        32px 22px rgba(255, 255, 255, 0.9),
+        64px 22px rgba(255, 255, 255, 0.86);
+      animation: menuCloudMove 36s linear infinite;
+      opacity: 0.72;
+    }
+
+    .cloudA {
+      left: 8%;
+      top: 8%;
+      width: 70px;
+    }
+
+    .cloudB {
+      left: 62%;
+      top: 12%;
+      width: 88px;
+      animation-duration: 48s;
+    }
+
+    @keyframes menuCloudMove {
+      from { transform: translateX(-40px); }
+      to { transform: translateX(160px); }
+    }
+
+    .mcHill {
+      position: absolute;
+      bottom: 135px;
+      width: 42vw;
+      height: 260px;
+      background:
+        linear-gradient(135deg, transparent 12px, rgba(255,255,255,0.08) 12px 14px, transparent 14px),
+        linear-gradient(180deg, #78a85d 0 20%, #5f824e 20% 34%, #7a6d5b 34% 60%, #4f463c 60% 100%);
+      clip-path: polygon(0 100%, 0 58%, 9% 50%, 16% 32%, 29% 24%, 40% 13%, 56% 21%, 68% 36%, 79% 43%, 92% 62%, 100% 68%, 100% 100%);
+      filter: saturate(1.08) contrast(1.05);
+    }
+
+    .hillLeft {
+      left: -4vw;
+    }
+
+    .hillRight {
+      right: -6vw;
+      transform: scaleX(-1);
+      opacity: 0.8;
+    }
+
+    .mcLake {
+      position: absolute;
+      left: 29vw;
+      right: 22vw;
+      bottom: 98px;
+      height: 104px;
+      background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.12) 0 3px, transparent 3px 12px),
+        linear-gradient(135deg, #1c5fd3, #1d8bd8);
+      clip-path: polygon(0 45%, 10% 22%, 26% 16%, 43% 30%, 65% 12%, 100% 38%, 93% 100%, 8% 100%);
+      box-shadow: 0 -10px 0 rgba(246, 232, 166, 0.92), 0 14px 28px rgba(0,0,0,0.24);
+      z-index: 1;
+    }
+
+    .mcGround {
+      position: absolute;
+      left: -4vw;
+      right: -4vw;
+      bottom: -20px;
+      height: 190px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.10) 25%, transparent 25%) 0 0 / 42px 42px,
+        linear-gradient(225deg, rgba(0,0,0,0.12) 25%, transparent 25%) 0 0 / 42px 42px,
+        linear-gradient(180deg, #6ebf4b, #315f2b);
+      transform: skewY(-2deg);
+      box-shadow: 0 -20px 30px rgba(0,0,0,0.18);
+      z-index: 2;
+    }
+
+    .mcTree {
+      position: absolute;
+      bottom: 122px;
+      width: 24px;
+      height: 74px;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,0.1), transparent 35%),
+        #5a351d;
+      box-shadow:
+        inset -7px 0 rgba(0,0,0,0.18),
+        0 16px 20px rgba(0,0,0,0.24);
+      z-index: 3;
+    }
+
+    .mcTree::before {
+      content: "";
+      position: absolute;
+      left: -42px;
+      top: -76px;
+      width: 108px;
+      height: 92px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.18) 0 15%, transparent 16%),
+        linear-gradient(45deg, #1d6b2b 0 25%, #2f8f39 26% 50%, #14532d 51% 75%, #2f8f39 76%);
+      background-size: 24px 24px;
+      border: 6px solid rgba(18, 83, 35, 0.45);
+      box-shadow:
+        inset -16px -16px rgba(0,0,0,0.18),
+        0 16px 24px rgba(0,0,0,0.22);
+    }
+
+    .mcTree::after {
+      content: "";
+      position: absolute;
+      left: -24px;
+      top: -48px;
+      width: 72px;
+      height: 58px;
+      background:
+        linear-gradient(45deg, #2f8f39 0 25%, #1d6b2b 26% 50%, #3da34a 51% 75%, #1d6b2b 76%);
+      background-size: 18px 18px;
+      box-shadow: inset -10px -10px rgba(0,0,0,0.16);
+    }
+
+    .treeA { left: 9%; }
+    .treeB { right: 11%; transform: scale(0.88); }
+    .treeC { left: 78%; bottom: 148px; transform: scale(0.65); opacity: 0.9; }
+
+    .mcBee {
+      position: absolute;
+      width: 22px;
+      height: 14px;
+      right: 17%;
+      top: 32%;
+      background: repeating-linear-gradient(90deg, #facc15 0 7px, #111827 7px 11px);
+      box-shadow: 4px -8px 0 rgba(255,255,255,0.6), -4px -8px 0 rgba(255,255,255,0.55);
+      animation: beeFloat 3.4s ease-in-out infinite;
+    }
+
+    @keyframes beeFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+
+    #mainMenu .menuScene {
+      display: none;
+    }
+
+    #mainMenu .menuCard {
+      width: min(560px, calc(100vw - 24px));
+      margin-top: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      overflow: visible;
+    }
+
+    #mainMenu .menuCard::before {
+      display: none;
+    }
+
+    #mainMenu .menuBadge,
+    #mainMenu .menuChips,
+    #mainMenu .menuFooter,
+    #mainMenu .menuCard p {
+      display: none;
+    }
+
+    .blockLogo {
+      position: relative;
+      display: inline-block;
+      margin: 0;
+      padding: 0 8px;
+      font-family: Impact, Haettenschweiler, "Arial Black", sans-serif;
+      font-size: clamp(54px, 9vw, 92px);
+      line-height: 0.9;
+      letter-spacing: 2px;
+      color: #d9d9d9;
+      text-transform: uppercase;
+      -webkit-text-stroke: 3px #1b1b1b;
+      text-shadow:
+        0 4px 0 #8c8c8c,
+        0 8px 0 #393939,
+        4px 10px 0 #111,
+        0 18px 22px rgba(0,0,0,0.45);
+      transform: perspective(500px) rotateX(6deg);
+    }
+
+    .editionText {
+      position: relative;
+      margin-top: -2px;
+      color: #f8fafc;
+      font-size: clamp(13px, 2vw, 18px);
+      font-weight: 900;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 2px 2px 0 #111;
+    }
+
+    .splashText {
+      position: absolute;
+      top: 48px;
+      right: 22px;
+      color: #facc15;
+      font-size: clamp(16px, 2.4vw, 26px);
+      font-weight: 900;
+      text-shadow: 2px 2px 0 #111, 0 0 12px rgba(250, 204, 21, 0.5);
+      transform: rotate(-18deg);
+      animation: splashPulse 0.9s ease-in-out infinite alternate;
+      white-space: nowrap;
+    }
+
+    @keyframes splashPulse {
+      from { transform: rotate(-18deg) scale(1); }
+      to { transform: rotate(-18deg) scale(1.08); }
+    }
+
+    #mainMenu .menuButtons {
+      width: min(405px, calc(100vw - 40px));
+      margin: 34px auto 0;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+
+    #mainMenu .menuButtons button {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 0;
+      color: #f8fafc;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.2), transparent 45%),
+        #777;
+      border: 2px solid #1f2937;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.55),
+        inset -2px -2px 0 rgba(0,0,0,0.55),
+        0 3px 0 rgba(0,0,0,0.35);
+      font-size: 14px;
+      font-weight: 700;
+      text-shadow: 2px 2px 0 #111;
+    }
+
+    #mainMenu .menuButtons button::after {
+      display: none;
+    }
+
+    #mainMenu .menuButtons button:hover {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.25), transparent 45%),
+        #8c8c8c;
+      outline: 2px solid rgba(255,255,255,0.55);
+      transform: none;
+      filter: none;
+    }
+
+    .bottomMenuButtons {
+      width: min(405px, calc(100vw - 40px));
+      margin: 8px auto 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    #mainMenu .bottomMenuButtons button {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 0;
+      color: #f8fafc;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.2), transparent 45%),
+        #777;
+      border: 2px solid #1f2937;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.55),
+        inset -2px -2px 0 rgba(0,0,0,0.55),
+        0 3px 0 rgba(0,0,0,0.35);
+      font-size: 14px;
+      font-weight: 700;
+      text-shadow: 2px 2px 0 #111;
+      cursor: pointer;
+    }
+
+    #mainMenu .bottomMenuButtons button:hover {
+      outline: 2px solid rgba(255,255,255,0.55);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.25), transparent 45%),
+        #8c8c8c;
+    }
+
+    .mcCornerIcon {
+      position: fixed;
+      bottom: 18px;
+      width: 32px;
+      height: 32px;
+      z-index: 4;
+      border: 2px solid #1f2937;
+      background:
+        linear-gradient(135deg, #d1d5db, #64748b);
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.55),
+        inset -2px -2px 0 rgba(0,0,0,0.45);
+    }
+
+    .mcIconLeft { left: 64px; }
+    .mcIconRight { right: 64px; }
+
+    #mainMenu .mcCornerIcon {
+      display: none;
+    }
+
+    .quitCard h1 {
+      color: #f8fafc;
+      -webkit-text-stroke: 0;
+      text-shadow: 0 5px 0 #111827, 0 18px 30px rgba(0,0,0,0.5);
+      font-size: clamp(34px, 6vw, 56px);
+    }
+
+    .quitCard p {
+      display: block;
+      color: #cbd5e1;
+    }
+
+    .menuVersion,
+    .menuCredit {
+      position: fixed;
+      bottom: 8px;
+      z-index: 6;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: 12px;
+      text-shadow: 2px 2px 0 #000;
+      pointer-events: none;
+    }
+
+    .menuVersion {
+      left: 10px;
+    }
+
+    .menuCredit {
+      right: 10px;
+    }
+
+    .loadingScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      color: white;
+      text-align: center;
+      background:
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.24) 0 2px, transparent 2px 16px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 16px),
+        linear-gradient(135deg, #4d3526, #72513a 45%, #3b281e);
+      image-rendering: pixelated;
+    }
+
+    .loadingScreen::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(45deg, transparent 0 40%, rgba(255,255,255,0.05) 41% 44%, transparent 45%),
+        radial-gradient(circle at 28% 32%, rgba(0,0,0,0.22), transparent 16%),
+        radial-gradient(circle at 70% 68%, rgba(255,255,255,0.08), transparent 14%);
+      background-size: 32px 32px, 96px 96px, 120px 120px;
+      opacity: 0.7;
+    }
+
+    .loadingLogo,
+    .loadingText,
+    .loadingBar,
+    .loadingTip {
+      position: relative;
+      z-index: 1;
+    }
+
+    .loadingLogo {
+      font-family: Impact, Haettenschweiler, "Arial Black", sans-serif;
+      font-size: clamp(44px, 7vw, 82px);
+      line-height: 0.9;
+      letter-spacing: 2px;
+      color: #e5e7eb;
+      text-transform: uppercase;
+      -webkit-text-stroke: 3px #111;
+      text-shadow:
+        0 4px 0 #777,
+        0 8px 0 #222,
+        0 16px 26px rgba(0,0,0,0.65);
+    }
+
+    .loadingText {
+      margin-top: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      text-shadow: 2px 2px 0 #000;
+    }
+
+    .loadingBar {
+      width: min(420px, calc(100vw - 56px));
+      height: 18px;
+      padding: 3px;
+      border: 2px solid #111;
+      background: #3f2b20;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.22),
+        inset -2px -2px 0 rgba(0,0,0,0.55);
+    }
+
+    #loadingFill {
+      width: 8%;
+      height: 100%;
+      background:
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 9px, transparent 9px 18px),
+        linear-gradient(180deg, #93c56a, #4f8c38);
+      transition: width 0.25s ease;
+    }
+
+    .loadingTip {
+      min-height: 20px;
+      color: #e5e7eb;
+      font-size: 13px;
+      text-shadow: 1px 1px 0 #000;
+    }
+
+    .creativeWindow {
+      width: min(920px, calc(100vw - 28px));
+      max-height: min(760px, calc(100vh - 38px));
+      padding: 16px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.08), transparent 38%),
+        #c6c6c6;
+      border: 4px solid #1f2937;
+      box-shadow:
+        inset 4px 4px 0 rgba(255,255,255,0.55),
+        inset -4px -4px 0 rgba(0,0,0,0.35),
+        0 24px 80px rgba(0,0,0,0.55);
+      color: #111827;
+      text-shadow: none;
+    }
+
+    .creativeHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .creativeHeader h1 {
+      margin: 0;
+      color: #1f2937;
+      font-size: 28px;
+      -webkit-text-stroke: 0;
+      text-shadow: 2px 2px 0 rgba(255,255,255,0.55);
+    }
+
+    .creativeHeader p {
+      margin: 4px 0 0;
+      color: #374151;
+      font-size: 13px;
+    }
+
+    .creativeSearch {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .creativeSearch input {
+      min-height: 36px;
+      padding: 0 10px;
+      color: #111827;
+      background: #f8fafc;
+      border: 3px solid #2b2b2b;
+      box-shadow:
+        inset 2px 2px 0 rgba(0,0,0,0.22),
+        inset -2px -2px 0 rgba(255,255,255,0.55);
+    }
+
+    .creativeTabs {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+
+    .creativeTab {
+      min-height: 34px;
+      padding: 0 8px;
+      color: #f8fafc;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.22), transparent 45%),
+        #6b7280;
+      border: 2px solid #1f2937;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.45),
+        inset -2px -2px 0 rgba(0,0,0,0.5);
+      font-size: 12px;
+      font-weight: 700;
+      text-shadow: 1px 1px 0 #000;
+      cursor: pointer;
+    }
+
+    .creativeTab.active {
+      color: #111827;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.55), transparent 55%),
+        #f8fafc;
+      text-shadow: none;
+    }
+
+    .creativeBody {
+      display: grid;
+      grid-template-columns: 1.4fr 0.8fr;
+      gap: 12px;
+      min-height: 380px;
+    }
+
+    .creativeGridPanel,
+    .creativeSidePanel {
+      padding: 10px;
+      background: #8f8f8f;
+      border: 3px solid #2b2b2b;
+      box-shadow:
+        inset 3px 3px 0 rgba(0,0,0,0.22),
+        inset -3px -3px 0 rgba(255,255,255,0.35);
+    }
+
+    .creativeItemGrid {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(38px, 1fr));
+      gap: 5px;
+      max-height: 310px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .creativeItem {
+      position: relative;
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #5f5f5f;
+      border: 2px solid #1f2937;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.35),
+        inset -2px -2px 0 rgba(0,0,0,0.55);
+    }
+
+    .creativeItem span {
+      width: 26px;
+      height: 26px;
+      display: block;
+      border: 2px solid rgba(0,0,0,0.25);
+      box-shadow: inset 0 5px 0 rgba(255,255,255,0.18), inset 0 -6px 0 rgba(0,0,0,0.2);
+    }
+
+    .creativeItem small {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 2px;
+      color: #f8fafc;
+      font-size: 8px;
+      text-align: center;
+      text-shadow: 1px 1px 0 #000;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .creativeFeatures {
+      display: grid;
+      gap: 8px;
+    }
+
+    .creativeFeature {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(255,255,255,0.28);
+      border: 2px solid rgba(31,41,55,0.45);
+      font-size: 12px;
+    }
+
+    .creativeFeature strong {
+      display: block;
+      font-size: 13px;
+    }
+
+    .creativeSwitch {
+      width: 42px;
+      height: 22px;
+      background: #374151;
+      border: 2px solid #111827;
+      box-shadow: inset 2px 2px 0 rgba(0,0,0,0.35);
+    }
+
+    .creativeSwitch.on {
+      background: #16a34a;
+    }
+
+    .creativeHotbar {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .creativeHotbar .creativeItem {
+      min-height: 40px;
+    }
+
+    .creativeActions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .creativeActions button,
+    .creativeSearch button,
+    .creativeHeader button {
+      min-height: 34px;
+      color: #f8fafc;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.2), transparent 45%),
+        #777;
+      border: 2px solid #1f2937;
+      box-shadow:
+        inset 2px 2px 0 rgba(255,255,255,0.5),
+        inset -2px -2px 0 rgba(0,0,0,0.5);
+      font-weight: 700;
+      text-shadow: 1px 1px 0 #000;
+      cursor: pointer;
+    }
+
+    #inventoryPanel {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(2, 6, 23, 0.55);
+      backdrop-filter: blur(3px);
+    }
+
+    .inventoryBox {
+      width: min(720px, calc(100vw - 28px));
+      padding: 18px;
+      border-radius: 16px;
+      background: var(--panel-strong);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+    }
+
+    .inventoryBox h2 {
+      margin: 0 0 14px;
+    }
+
+    #inventoryGrid,
+    #craftGrid {
+      display: grid;
+      gap: 6px;
+    }
+
+    #inventoryGrid {
+      grid-template-columns: repeat(9, 1fr);
+    }
+
+    #craftGrid {
+      grid-template-columns: repeat(2, 1fr);
+      width: 148px;
+    }
+
+    .invSlot {
+      min-height: 58px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .invRow {
+      display: flex;
+      gap: 20px;
+      align-items: start;
+      margin-top: 18px;
+    }
+
+    .craftResult {
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(15, 23, 42, 0.7);
+      min-height: 90px;
+      color: var(--muted);
+      flex: 1;
+      text-align: left;
+    }
+
+    #optionsPanel label {
+      display: grid;
+      grid-template-columns: 1fr 140px;
+      align-items: center;
+      gap: 12px;
+      margin: 12px 0;
+      text-align: left;
+      color: var(--muted);
+    }
+
+    #optionsPanel input {
+      width: 100%;
+    }
+
+    #messageToast {
+      position: fixed;
+      left: 50%;
+      top: 22%;
+      z-index: 65;
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 999px;
+      color: white;
+      background: rgba(2, 6, 23, 0.88);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.45);
+      font-weight: 700;
+    }
+
+    @media (max-width: 720px) {
+      #minimap {
+        width: 104px;
+        height: 104px;
+      }
+
+      .bars {
+        font-size: 16px;
+      }
+
+      .slotIcon {
+        width: 24px;
+        height: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="gameRoot"></div>
+
+  <div id="crosshair" class="hidden"></div>
+  <div id="topLeft" class="hidden">
+    <div id="blockTooltip">No block</div>
+    <div id="statusText">WASD move - Space jump - Click to lock mouse</div>
+  </div>
+
+  <div id="breakBarWrap" class="hidden">
+    <div id="breakBar"></div>
+  </div>
+
+  <canvas id="minimap" width="148" height="148" class="hidden"></canvas>
+
+  <div id="chatLog"></div>
+  <input id="chatInput" class="hidden" autocomplete="off" spellcheck="false" placeholder="Type command or message...">
+
+  <div id="hud" class="hidden">
+    <div class="bars">
+      <div id="healthBar"></div>
+      <div id="armorBar"></div>
+      <div id="hungerBar"></div>
+    </div>
+    <div id="xpWrap"><div id="xpBar"></div></div>
+    <div id="hotbar"></div>
+  </div>
+
+  <div id="inventoryPanel" class="hidden">
+    <div class="inventoryBox">
+      <h2>Inventory</h2>
+      <div id="inventoryGrid"></div>
+      <div class="invRow">
+        <div>
+          <h3>2x2 Crafting</h3>
+          <div id="craftGrid"></div>
+        </div>
+        <div id="craftResult" class="craftResult">Click a recipe item in inventory to try simple crafting.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mainMenu" class="screen">
+    <div class="minecraftBackdrop">
+      <div class="mcCloud cloudA"></div>
+      <div class="mcCloud cloudB"></div>
+      <div class="mcHill hillLeft"></div>
+      <div class="mcHill hillRight"></div>
+      <div class="mcLake"></div>
+      <div class="mcTree treeA"></div>
+      <div class="mcTree treeB"></div>
+      <div class="mcTree treeC"></div>
+      <div class="mcBee"></div>
+      <div class="mcGround"></div>
+      <div class="mcCornerIcon mcIconLeft"></div>
+      <div class="mcCornerIcon mcIconRight"></div>
+      <div class="menuVersion">Minecraft Web Edition 0.1</div>
+      <div class="menuCredit">Fan-made browser project - custom code and textures</div>
+    </div>
+    <div class="menuScene">
+      <div class="menuCube cube1"></div>
+      <div class="menuCube stone cube2"></div>
+      <div class="menuCube wood cube3"></div>
+      <div class="menuCube water cube4"></div>
+      <div class="menuCube cube5"></div>
+    </div>
+    <div class="menuCard">
+      <h1 class="blockLogo">Minecraft</h1>
+      <div class="editionText">Web Edition</div>
+      <div class="splashText">Now in your browser!</div>
+      <div class="menuBadge">Browser voxel survival</div>
+      <p>A lightweight Minecraft-inspired voxel world. Mine, build, explore, and survive in the browser.</p>
+      <div class="menuChips">
+        <span class="menuChip">Procedural worlds</span>
+        <span class="menuChip">Mine & build</span>
+        <span class="menuChip">Offline play</span>
+      </div>
+      <div class="menuButtons">
+        <button id="playBtn" aria-label="Start singleplayer world">Singleplayer</button>
+        <button id="creativeBtn" aria-label="Open creative mode setup">Creative</button>
+      </div>
+      <div class="bottomMenuButtons">
+        <button id="optionsBtn" class="plainButton" aria-label="Open options">Options...</button>
+        <button id="quitGameBtn" class="plainButton" aria-label="Quit game">Quit Game</button>
+      </div>
+      <div class="menuFooter">
+        <span>WASD move</span>
+        <span>Mouse look</span>
+        <span>E inventory</span>
+        <span>T commands</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="creativePanel" class="screen hidden" aria-hidden="true">
+    <div class="creativeWindow">
+      <div class="creativeHeader">
+        <div>
+          <h1>Creative Mode</h1>
+          <p>Build freely with flight, instant blocks, full inventory, and world tools.</p>
+        </div>
+        <button id="creativeCloseBtn" type="button">Back</button>
+      </div>
+
+      <div class="creativeSearch">
+        <input id="creativeSearchInput" type="search" placeholder="Search blocks, tools, food, mobs..." autocomplete="off">
+        <button id="creativeSearchBtn" type="button">Search</button>
+      </div>
+
+      <div class="creativeTabs" id="creativeTabs">
+        <button class="creativeTab active" data-tab="search">Search</button>
+        <button class="creativeTab" data-tab="building">Building Blocks</button>
+        <button class="creativeTab" data-tab="colored">Colored Blocks</button>
+        <button class="creativeTab" data-tab="natural">Natural Blocks</button>
+        <button class="creativeTab" data-tab="functional">Functional Blocks</button>
+        <button class="creativeTab" data-tab="redstone">Redstone</button>
+        <button class="creativeTab" data-tab="tools">Tools</button>
+        <button class="creativeTab" data-tab="combat">Combat</button>
+        <button class="creativeTab" data-tab="food">Food</button>
+        <button class="creativeTab" data-tab="ingredients">Ingredients</button>
+        <button class="creativeTab" data-tab="spawn">Spawn Eggs</button>
+        <button class="creativeTab" data-tab="survival">Survival Inventory</button>
+      </div>
+
+      <div class="creativeBody">
+        <div class="creativeGridPanel">
+          <div id="creativeItemGrid" class="creativeItemGrid">
+            <button class="creativeItem" data-item="grass"><span style="background:#3f9f37"></span><small>Grass</small></button>
+            <button class="creativeItem" data-item="dirt"><span style="background:#7a5232"></span><small>Dirt</small></button>
+            <button class="creativeItem" data-item="stone"><span style="background:#777f89"></span><small>Stone</small></button>
+            <button class="creativeItem" data-item="cobble"><span style="background:#5f6670"></span><small>Cobble</small></button>
+            <button class="creativeItem" data-item="sand"><span style="background:#d9c27c"></span><small>Sand</small></button>
+            <button class="creativeItem" data-item="oak_log"><span style="background:#8b5a2b"></span><small>Oak Log</small></button>
+            <button class="creativeItem" data-item="oak_planks"><span style="background:#b8874f"></span><small>Planks</small></button>
+            <button class="creativeItem" data-item="glass"><span style="background:#bdeeff"></span><small>Glass</small></button>
+            <button class="creativeItem" data-item="torch"><span style="background:#facc15"></span><small>Torch</small></button>
+            <button class="creativeItem" data-item="chest"><span style="background:#a66a2f"></span><small>Chest</small></button>
+            <button class="creativeItem" data-item="crafting_table"><span style="background:#9b642f"></span><small>Crafting</small></button>
+            <button class="creativeItem" data-item="furnace"><span style="background:#55595f"></span><small>Furnace</small></button>
+            <button class="creativeItem" data-item="redstone"><span style="background:#dc2626"></span><small>Redstone</small></button>
+            <button class="creativeItem" data-item="piston"><span style="background:#8b7355"></span><small>Piston</small></button>
+            <button class="creativeItem" data-item="tnt"><span style="background:#dc2626"></span><small>TNT</small></button>
+            <button class="creativeItem" data-item="diamond_sword"><span style="background:#38e8ff"></span><small>Sword</small></button>
+            <button class="creativeItem" data-item="diamond_pickaxe"><span style="background:#60a5fa"></span><small>Pickaxe</small></button>
+            <button class="creativeItem" data-item="bow"><span style="background:#8b5a2b"></span><small>Bow</small></button>
+            <button class="creativeItem" data-item="apple"><span style="background:#ef4444"></span><small>Apple</small></button>
+            <button class="creativeItem" data-item="bread"><span style="background:#d6a341"></span><small>Bread</small></button>
+            <button class="creativeItem" data-item="cow_spawn"><span style="background:#5b3a1f"></span><small>Cow Egg</small></button>
+            <button class="creativeItem" data-item="pig_spawn"><span style="background:#f9a8d4"></span><small>Pig Egg</small></button>
+            <button class="creativeItem" data-item="zombie_spawn"><span style="background:#16a34a"></span><small>Zombie Egg</small></button>
+            <button class="creativeItem" data-item="creeper_spawn"><span style="background:#22c55e"></span><small>Creeper Egg</small></button>
+          </div>
+
+          <div id="creativeHotbar" class="creativeHotbar" aria-label="Creative hotbar preview">
+            <button class="creativeItem"><span style="background:#3f9f37"></span><small>1</small></button>
+            <button class="creativeItem"><span style="background:#777f89"></span><small>2</small></button>
+            <button class="creativeItem"><span style="background:#b8874f"></span><small>3</small></button>
+            <button class="creativeItem"><span style="background:#bdeeff"></span><small>4</small></button>
+            <button class="creativeItem"><span style="background:#facc15"></span><small>5</small></button>
+            <button class="creativeItem"><span style="background:#dc2626"></span><small>6</small></button>
+            <button class="creativeItem"><span style="background:#38e8ff"></span><small>7</small></button>
+            <button class="creativeItem"><span style="background:#ef4444"></span><small>8</small></button>
+            <button class="creativeItem"><span style="background:#22c55e"></span><small>9</small></button>
+          </div>
+        </div>
+
+        <div class="creativeSidePanel">
+          <div class="creativeFeatures">
+            <div class="creativeFeature"><span>F</span><div><strong>Flight</strong>Double jump to fly, hold Space/Ctrl to move up/down.</div><span id="creativeFlightSwitch" class="creativeSwitch on"></span></div>
+            <div class="creativeFeature"><span>I</span><div><strong>Instant Break</strong>Break blocks instantly without tool limits.</div><span id="creativeBreakSwitch" class="creativeSwitch on"></span></div>
+            <div class="creativeFeature"><span>∞</span><div><strong>Unlimited Items</strong>Place blocks without reducing stack count.</div><span id="creativeItemsSwitch" class="creativeSwitch on"></span></div>
+            <div class="creativeFeature"><span>♥</span><div><strong>No Damage</strong>No fall damage, hunger damage, mob damage, or drowning.</div><span id="creativeDamageSwitch" class="creativeSwitch on"></span></div>
+            <div class="creativeFeature"><span>☼</span><div><strong>World Tools</strong>Set day/night, weather, clear mobs, and fill hotbar.</div><span id="creativeWorldSwitch" class="creativeSwitch on"></span></div>
+          </div>
+
+          <div class="creativeActions">
+            <button id="creativeStartBtn" type="button">Start Creative</button>
+            <button id="creativeFillHotbarBtn" type="button">Fill Hotbar</button>
+            <button id="creativeClearMobsBtn" type="button">Clear Mobs</button>
+            <button id="creativeDayBtn" type="button">Set Day</button>
+            <button id="creativeNightBtn" type="button">Set Night</button>
+            <button id="creativeWeatherBtn" type="button">Clear Weather</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseMenu" class="screen hidden">
+    <div class="menuCard">
+      <h1>Paused</h1>
+      <p>Your world is waiting. Change settings or return to the title screen.</p>
+      <div class="menuButtons">
+        <button id="resumeBtn">Resume</button>
+        <button id="pauseOptionsBtn" class="plainButton">Options</button>
+        <button id="titleBtn" class="plainButton">Quit to Title</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deathScreen" class="screen hidden">
+    <div class="menuCard">
+      <h1>You Died!</h1>
+      <p id="deathText">Score: 0</p>
+      <div class="menuButtons">
+        <button id="respawnBtn">Respawn</button>
+        <button id="deathTitleBtn" class="plainButton">Title Screen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="optionsPanel" class="screen hidden">
+    <div class="menuCard">
+      <h1>Options</h1>
+      <label>Render distance <input id="renderDistanceInput" type="range" min="2" max="7" value="5"></label>
+      <label>FOV <input id="fovInput" type="range" min="55" max="95" value="70"></label>
+      <label>Mouse sensitivity <input id="sensitivityInput" type="range" min="0.001" max="0.006" step="0.001" value="0.003"></label>
+      <div class="menuButtons">
+        <button id="fullscreenBtn">Toggle Fullscreen</button>
+        <button id="closeOptionsBtn" class="plainButton">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="quitOverlay" class="screen hidden">
+    <div class="menuCard quitCard">
+      <h1>Thanks for playing</h1>
+      <p>Browsers block most pages from closing themselves. You can close this tab now, or go back to the title screen.</p>
+      <div class="menuButtons">
+        <button id="backFromQuitBtn">Back to Title</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="worldLoading" class="loadingScreen hidden">
+    <div class="loadingLogo">Minecraft</div>
+    <div class="loadingText">Generating world</div>
+    <div class="loadingBar"><div id="loadingFill"></div></div>
+    <div id="loadingTip" class="loadingTip">Preparing spawn area...</div>
+  </div>
+
+  <div id="messageToast" class="hidden"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
+
+
+class EventB
