@@ -83,6 +83,8 @@ class Controls {
     this.sensitivity = 0.003;
     this.onLook = null;
     this.onHotbar = null;
+    this.moveVector = { x: 0, y: 0 };
+    this.isMobile = Controls.detectMobile();
 
     document.addEventListener("keydown", (event) => this.keyDown(event));
     document.addEventListener("keyup", (event) => this.keyUp(event));
@@ -91,7 +93,18 @@ class Controls {
     document.addEventListener("mouseup", (event) => this.mouseUp(event));
     document.addEventListener("wheel", (event) => this.mouseWheel(event), { passive: false });
     document.addEventListener("pointerlockchange", () => this.lockChanged());
-    this.renderer.renderer.domElement.addEventListener("click", () => this.lock());
+
+    if (this.isMobile) {
+      this.setupMobileControls();
+    } else {
+      this.renderer.renderer.domElement.addEventListener("click", () => this.lock());
+    }
+  }
+
+  static detectMobile() {
+    let coarsePointer = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    let hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    return coarsePointer || hasTouch;
   }
 
   lock() {
@@ -131,6 +144,154 @@ class Controls {
     if (!this.onHotbar) return;
     event.preventDefault();
     this.onHotbar(event.deltaY > 0 ? 1 : -1);
+  }
+
+  setupMobileControls() {
+    let wrap = document.getElementById("mobileControls");
+    if (wrap) wrap.classList.remove("hidden");
+
+    let status = document.getElementById("statusText");
+    if (status) status.textContent = "Joystick to move - drag screen to look - buttons to act";
+
+    this.setupJoystick();
+    this.setupLookZone();
+    this.setupHoldButton("jumpBtn", () => this.keys.Space = true, () => this.keys.Space = false);
+    this.setupHoldButton("breakBtn", () => this.leftDown = true, () => this.leftDown = false);
+    this.setupTapButton("placeBtn", () => this.rightPressed = true);
+    this.setupToggleButton("sprintBtn", (active) => this.keys.ControlLeft = active);
+  }
+
+  setupJoystick() {
+    let base = document.getElementById("joystickBase");
+    let nub = document.getElementById("joystickNub");
+    if (!base || !nub) return;
+
+    let touchId = null;
+    let centerX = 0;
+    let centerY = 0;
+    let maxDist = 40;
+
+    let updateStick = (touch) => {
+      let dx = touch.clientX - centerX;
+      let dy = touch.clientY - centerY;
+      let dist = Math.min(maxDist, Math.hypot(dx, dy));
+      let angle = Math.atan2(dy, dx);
+      let nx = Math.cos(angle) * dist;
+      let ny = Math.sin(angle) * dist;
+      nub.style.transform = "translate(" + nx + "px, " + ny + "px)";
+
+      let magnitude = dist / maxDist;
+      let safeDist = dist || 1;
+      this.moveVector.x = (dx / safeDist) * magnitude;
+      this.moveVector.y = -(dy / safeDist) * magnitude;
+    };
+
+    let resetStick = () => {
+      touchId = null;
+      nub.style.transform = "translate(0px, 0px)";
+      this.moveVector.x = 0;
+      this.moveVector.y = 0;
+    };
+
+    base.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      let touch = event.changedTouches[0];
+      touchId = touch.identifier;
+      let rect = base.getBoundingClientRect();
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+      updateStick(touch);
+    }, { passive: false });
+
+    base.addEventListener("touchmove", (event) => {
+      event.preventDefault();
+      for (let touch of event.changedTouches) {
+        if (touch.identifier === touchId) updateStick(touch);
+      }
+    }, { passive: false });
+
+    let endHandler = (event) => {
+      for (let touch of event.changedTouches) {
+        if (touch.identifier === touchId) resetStick();
+      }
+    };
+
+    base.addEventListener("touchend", endHandler);
+    base.addEventListener("touchcancel", endHandler);
+  }
+
+  setupLookZone() {
+    let zone = document.getElementById("lookZone");
+    if (!zone) return;
+
+    let touchId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    zone.addEventListener("touchstart", (event) => {
+      let touch = event.changedTouches[0];
+      touchId = touch.identifier;
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+    }, { passive: true });
+
+    zone.addEventListener("touchmove", (event) => {
+      for (let touch of event.changedTouches) {
+        if (touch.identifier !== touchId) continue;
+        event.preventDefault();
+        let dx = touch.clientX - lastX;
+        let dy = touch.clientY - lastY;
+        lastX = touch.clientX;
+        lastY = touch.clientY;
+        if (this.onLook) this.onLook(dx * this.sensitivity * 1.6, dy * this.sensitivity * 1.6);
+      }
+    }, { passive: false });
+
+    let endHandler = (event) => {
+      for (let touch of event.changedTouches) {
+        if (touch.identifier === touchId) touchId = null;
+      }
+    };
+
+    zone.addEventListener("touchend", endHandler);
+    zone.addEventListener("touchcancel", endHandler);
+  }
+
+  setupHoldButton(id, onStart, onEnd) {
+    let el = document.getElementById(id);
+    if (!el) return;
+
+    el.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      onStart();
+    }, { passive: false });
+
+    let release = () => onEnd();
+    el.addEventListener("touchend", release);
+    el.addEventListener("touchcancel", release);
+  }
+
+  setupTapButton(id, onTap) {
+    let el = document.getElementById(id);
+    if (!el) return;
+
+    el.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      onTap();
+    }, { passive: false });
+  }
+
+  setupToggleButton(id, onToggle) {
+    let el = document.getElementById(id);
+    if (!el) return;
+
+    let active = false;
+    el.addEventListener("touchstart", (event) => {
+      event.preventDefault();
+      active = !active;
+      el.classList.toggle("mobileBtnActive", active);
+      onToggle(active);
+    }, { passive: false });
   }
 
   consumeRightClick() {
@@ -229,6 +390,10 @@ class Player {
     if (this.controls.keys.KeyS) wish.sub(forward);
     if (this.controls.keys.KeyD) wish.add(right);
     if (this.controls.keys.KeyA) wish.sub(right);
+
+    let stick = this.controls.moveVector;
+    if (stick.y !== 0) wish.add(forward.clone().multiplyScalar(stick.y));
+    if (stick.x !== 0) wish.add(right.clone().multiplyScalar(stick.x));
 
     if (wish.lengthSq() > 0) {
       wish.normalize().multiplyScalar(speed);

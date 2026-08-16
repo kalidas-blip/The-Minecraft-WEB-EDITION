@@ -1415,6 +1415,129 @@
         height: 24px;
       }
     }
+
+    #mobileControls {
+      position: fixed;
+      inset: 0;
+      z-index: 36;
+      pointer-events: none;
+    }
+
+    #lookZone {
+      position: fixed;
+      inset: 0;
+      z-index: 34;
+      pointer-events: auto;
+    }
+
+    #joystickBase {
+      position: fixed;
+      left: 26px;
+      bottom: 26px;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      z-index: 37;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #joystickNub {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 46px;
+      height: 46px;
+      margin-left: -23px;
+      margin-top: -23px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.45);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      transition: transform 0.03s linear;
+    }
+
+    #mobileButtons {
+      position: fixed;
+      right: 22px;
+      bottom: 26px;
+      z-index: 37;
+      pointer-events: auto;
+      display: grid;
+      grid-template-columns: 64px 64px;
+      grid-template-rows: 64px 64px;
+      gap: 12px;
+    }
+
+    .mobileBtn {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .mobileBtn:active {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .mobileBtnActive {
+      background: rgba(120, 200, 255, 0.35);
+      border-color: rgba(120, 200, 255, 0.7);
+    }
+
+    #breakBtn {
+      grid-column: 1;
+      grid-row: 2;
+    }
+
+    #jumpBtn {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    #placeBtn {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    #sprintBtn {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    @media (max-width: 480px) {
+      #joystickBase {
+        width: 96px;
+        height: 96px;
+        left: 18px;
+        bottom: 18px;
+      }
+
+      .mobileBtn {
+        width: 56px;
+        height: 56px;
+      }
+
+      #mobileButtons {
+        right: 16px;
+        bottom: 18px;
+        grid-template-columns: 56px 56px;
+        grid-template-rows: 56px 56px;
+        gap: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1443,6 +1566,19 @@
     </div>
     <div id="xpWrap"><div id="xpBar"></div></div>
     <div id="hotbar"></div>
+  </div>
+
+  <div id="mobileControls" class="hidden">
+    <div id="lookZone"></div>
+    <div id="joystickBase">
+      <div id="joystickNub"></div>
+    </div>
+    <div id="mobileButtons">
+      <div id="sprintBtn" class="mobileBtn">SPRINT</div>
+      <div id="placeBtn" class="mobileBtn">PLACE</div>
+      <div id="breakBtn" class="mobileBtn">BREAK</div>
+      <div id="jumpBtn" class="mobileBtn">JUMP</div>
+    </div>
   </div>
 
   <div id="inventoryPanel" class="hidden">

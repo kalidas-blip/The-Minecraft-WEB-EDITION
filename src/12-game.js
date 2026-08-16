@@ -87,7 +87,7 @@ class Game {
         this.menu.hideMain();
         this.menu.hidePause();
         this.hud.show();
-        this.chat.add(wantedMode === "creative" ? "Creative world created. Fly, build, and use the Creative menu." : "New world created. Click the game to lock mouse.");
+        this.chat.add(wantedMode === "creative" ? "Creative world created. Fly, build, and use the Creative menu." : (this.player.controls.isMobile ? "New world created. Use the joystick and buttons to play." : "New world created. Click the game to lock mouse."));
         this.showMessage(wantedMode === "creative" ? "Creative mode enabled" : "World loaded");
 
         setTimeout(() => {

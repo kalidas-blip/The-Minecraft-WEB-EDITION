@@ -18,6 +18,9 @@ class HUD {
     this.topLeft.classList.remove("hidden");
     document.getElementById("crosshair").classList.remove("hidden");
     document.getElementById("minimap").classList.remove("hidden");
+    if (this.game.player && this.game.player.controls.isMobile) {
+      document.getElementById("mobileControls").classList.remove("hidden");
+    }
   }
 
   hide() {
@@ -25,6 +28,7 @@ class HUD {
     this.topLeft.classList.add("hidden");
     document.getElementById("crosshair").classList.add("hidden");
     document.getElementById("minimap").classList.add("hidden");
+    document.getElementById("mobileControls").classList.add("hidden");
   }
 
   update() {
